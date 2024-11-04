@@ -1,101 +1,157 @@
-import Image from "next/image";
+/* eslint-disable @typescript-eslint/no-unused-vars */
+"use client"
+import React, { useEffect, useState } from 'react';
+import { TodoItem } from './components/todoItem';
+import { TodoForm } from './components/todoForm';
+import { todoService } from './services/todoService';
+import { Todo } from './types/todo';
+import { Loader2 } from 'lucide-react';
+import { SiAzurefunctions, SiMicrosoftazure } from "react-icons/si";
+import Image from 'next/image';
+type Filter = 'all' | 'completed' | 'incomplete';
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Filter>('all');
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const fetchTodos = async () => {
+    try {
+      const data = await todoService.getAllTodos();
+      setTodos(data);
+      setError(null);
+    } catch (err) {
+      setError('Failed to fetch todos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTodos();
+  }, []);
+
+  const handleCreateTodo = async (title: string) => {
+    if (todos.length >= 15) {
+      setError('You cannot add more than 15 tasks. Please delete an existing task before adding a new one.');
+      return;
+    }
+
+    try {
+      const newTodo = await todoService.createTodo({ title });
+      setTodos((prev) => [...prev, newTodo]);
+      setError(null);
+    } catch (err) {
+      setError('Failed to create todo');
+    }
+  };
+
+  const handleToggleTodo = async (id: string, completed: boolean) => {
+    try {
+      const updatedTodo = await todoService.updateTodo(id, { isCompleted: completed });
+      setTodos((prev) =>
+        prev.map((todo) => (todo.rowKey === id ? updatedTodo : todo))
+      );
+    } catch (err) {
+      setError('Failed to update todo');
+    }
+  };
+
+  const handleDeleteTodo = async (id: string) => {
+    try {
+      await todoService.deleteTodo(id);
+      setTodos((prev) => prev.filter((todo) => todo.rowKey !== id));
+    } catch (err) {
+      setError('Failed to delete todo');
+    }
+  };
+
+  const filteredTodos = todos.filter((todo) => {
+    if (filter === 'completed') return todo.isCompleted;
+    if (filter === 'incomplete') return !todo.isCompleted;
+    return true;
+  });
+
+  return (
+    <main className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-2xl mx-auto px-4">
+        <div className="bg-white rounded-xl shadow-sm p-6 space-y-6">
+          <h1 className="text-2xl font-bold text-gray-900">Todo List</h1>
+
+          <TodoForm onSubmit={handleCreateTodo} />
+
+          {error && (
+            <div className="p-4 bg-red-50 text-red-600 rounded-lg">
+              {error}
+            </div>
+          )}
+
+          <div className="flex space-x-4">
+            <button
+              className={`px-4 py-2 rounded ${filter === 'all' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+              onClick={() => setFilter('all')}
+            >
+              All
+            </button>
+            <button
+              className={`px-4 py-2 rounded ${filter === 'completed' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+              onClick={() => setFilter('completed')}
+            >
+              Completed
+            </button>
+            <button
+              className={`px-4 py-2 rounded ${filter === 'incomplete' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+              onClick={() => setFilter('incomplete')}
+            >
+              Incomplete
+            </button>
+          </div>
+
+          {loading ? (
+            <div className="flex justify-center p-8">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+            </div>
+          ) : filteredTodos.length === 0 ? (
+            <p className="text-center text-gray-500 py-8">No todos yet. Add one above!</p>
+          ) : (
+            <div className="space-y-3">
+              {filteredTodos.map((todo) => (
+                <TodoItem
+                  key={todo.rowKey}
+                  todo={todo}
+                  onToggle={handleToggleTodo}
+                  onDelete={handleDeleteTodo}
+                />
+              ))}
+            </div>
+          )}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+
+        {/* Created By Section */}
+        <footer className="mt-6 text-center">
+          <div className="flex justify-center items-center space-x-5">
+            <p className="text-gray-600">Created by</p>
+            <div>
+              <SiAzurefunctions className="text-blue-500 w-10 h-10" title="Azure Functions" />
+            </div>
+            <div>
+              <SiMicrosoftazure className="text-blue-500 w-10 h-10" title="Microsoft Azure" />
+            </div>
+            <div>
+              <Image
+                src="./Table.svg"
+                alt="Azure Table Storage"
+                width={40}
+                height={40}
+                className="object-contain"
+                title='Azure Table Storage'
+              />
+            </div>
+          </div>
+        </footer>
+
+      </div>
+    </main>
   );
 }
